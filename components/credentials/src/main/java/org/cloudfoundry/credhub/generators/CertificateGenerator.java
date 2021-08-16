@@ -26,6 +26,7 @@ public class CertificateGenerator implements CredentialGenerator<CertificateCred
   private final CertificateAuthorityService certificateAuthorityService;
   private final Integer caMinimumDuration;
   private final Integer leafMinimumDuration;
+  private final boolean minimumDurationEnabled;
 
 
   @Autowired
@@ -33,6 +34,7 @@ public class CertificateGenerator implements CredentialGenerator<CertificateCred
     final RsaKeyPairGenerator keyGenerator,
     final SignedCertificateGenerator signedCertificateGenerator,
     final CertificateAuthorityService certificateAuthorityService,
+    @Value("${certificates.minimum_duration_enabled:#{false}}") final boolean minimumDurationEnabled,
     @Value("${certificates.ca_minimum_duration:#{null}}") final Integer caMinimumDuration,
     @Value("${certificates.leaf_minimum_duration:#{null}}") final Integer leafMinimumDuration) {
     super();
@@ -41,6 +43,7 @@ public class CertificateGenerator implements CredentialGenerator<CertificateCred
     this.certificateAuthorityService = certificateAuthorityService;
     this.caMinimumDuration = caMinimumDuration;
     this.leafMinimumDuration = leafMinimumDuration;
+    this.minimumDurationEnabled = minimumDurationEnabled;
   }
 
   @Override
@@ -59,6 +62,7 @@ public class CertificateGenerator implements CredentialGenerator<CertificateCred
     Boolean durationOverridden = null;
 
     params.setDuration(getCertificateDuration(params));
+    params.setMinimumDurationEnabled(minimumDurationEnabled);
 
     if (originalDuration != params.getDuration()) {
       durationOverridden = true;
@@ -131,6 +135,10 @@ public class CertificateGenerator implements CredentialGenerator<CertificateCred
   }
 
   private int getCertificateDuration(final CertificateGenerationParameters params) {
+    if (!minimumDurationEnabled) {
+      return params.getDuration();
+    }
+
     if (params.isCa() && caMinimumDuration != null) {
       return Math.max(params.getDuration(), caMinimumDuration);
     } else if (!params.isCa() && leafMinimumDuration != null) {

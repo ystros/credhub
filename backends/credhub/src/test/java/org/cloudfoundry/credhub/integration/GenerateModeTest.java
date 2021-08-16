@@ -1,6 +1,7 @@
 package org.cloudfoundry.credhub.integration;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.function.Consumer;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,7 @@ import static org.junit.Assert.assertThat;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.http.MediaType.APPLICATION_JSON_UTF8;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -334,7 +336,7 @@ public class GenerateModeTest {
     }
 
     @Test
-    public void generatingACredential_whenConvergeIsSet_andTheCertificateParamsAreTheSameAsTheExistingCredentialExceptDuration_doesNotUpdatesTheCredential() throws Exception {
+    public void generatingACredential_whenConvergeIsSetAndMinimumDurationIsDisabled_andTheCertificateParamsAreTheSameAsTheExistingCredentialExceptDuration_UpdatesTheCredential() throws Exception {
         MockHttpServletRequestBuilder postRequest = post("/api/v1/data")
                 .header("Authorization", "Bearer " + ALL_PERMISSIONS_TOKEN)
                 .accept(APPLICATION_JSON)
@@ -356,6 +358,7 @@ public class GenerateModeTest {
                 .getContentAsString());
 
         final String firstVersionId = response.read("$.id").toString();
+        final Integer totalVersionsBeforeUpdate = getVersionsForCertificate(CREDENTIAL_NAME).size();
 
         postRequest = post("/api/v1/data")
                 .header("Authorization", "Bearer " + ALL_PERMISSIONS_TOKEN)
@@ -378,8 +381,10 @@ public class GenerateModeTest {
                 .getContentAsString());
 
         final String secondVersionId = response.read("$.id").toString();
+        final Integer totalVersionsAfterUpdate = getVersionsForCertificate(CREDENTIAL_NAME).size();
 
-        assertThat(secondVersionId, is(equalTo(firstVersionId)));
+        assertThat(secondVersionId, is(not(equalTo(firstVersionId))));
+        assertThat(totalVersionsAfterUpdate, is(equalTo(totalVersionsBeforeUpdate + 1)));
     }
 
     @Test
@@ -402,5 +407,18 @@ public class GenerateModeTest {
         mockMvc.perform(postRequest).andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
                 .andExpect(jsonPath("$.error").value(expectedError));
+    }
+
+    private List<Object> getVersionsForCertificate(String certificateName) throws Exception {
+        MockHttpServletRequestBuilder getRequest = get("/api/v1/certificates?name=" + certificateName)
+                .header("Authorization", "Bearer " + ALL_PERMISSIONS_TOKEN)
+                .accept(APPLICATION_JSON)
+                .contentType(APPLICATION_JSON);
+        DocumentContext response = JsonPath.parse(mockMvc.perform(getRequest).andExpect(status().isOk())
+                .andDo(print())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+        return response.read("$.certificates[0].versions[*]");
     }
 }

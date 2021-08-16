@@ -252,6 +252,58 @@ public class CertificateMinimumDurationTest {
         assertThat(versions.size(), is(equalTo(2)));
     }
 
+    @Test
+    public void generatingACredential_whenConvergeIsSetAndMinimumDurationIsEnabled_andTheCertificateParamsAreTheSameAsTheExistingCredentialExceptDuration_DoesNotUpdateTheCredential() throws Exception {
+        MockHttpServletRequestBuilder postRequest = post("/api/v1/data")
+                .header("Authorization", "Bearer " + ALL_PERMISSIONS_TOKEN)
+                .accept(APPLICATION_JSON)
+                .contentType(APPLICATION_JSON)
+                .content("{" +
+                        "\"type\":\"certificate\"," +
+                        "\"name\":\"" + CREDENTIAL_NAME + "\"," +
+                        "\"parameters\":{" +
+                        "\"common_name\":\"some-certificate\"," +
+                        "\"is_ca\":true," +
+                        "\"duration\":365" +
+                        "}" +
+                        "}");
+
+        DocumentContext response = JsonPath.parse(mockMvc.perform(postRequest).andExpect(status().isOk())
+                .andDo(print())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+
+        final String firstVersionId = response.read("$.id").toString();
+        final Integer totalVersionsBeforeUpdate = getVersionsForCertificate(CREDENTIAL_NAME).size();
+
+        postRequest = post("/api/v1/data")
+                .header("Authorization", "Bearer " + ALL_PERMISSIONS_TOKEN)
+                .accept(APPLICATION_JSON)
+                .contentType(APPLICATION_JSON)
+                .content("{" +
+                        "\"type\":\"certificate\"," +
+                        "\"name\":\"" + CREDENTIAL_NAME + "\"," +
+                        "\"parameters\":{" +
+                        "\"common_name\":\"some-certificate\"," +
+                        "\"is_ca\":true," +
+                        "\"duration\":730" +
+                        "}" +
+                        "}");
+
+        response = JsonPath.parse(mockMvc.perform(postRequest).andExpect(status().isOk())
+                .andDo(print())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+
+        final String secondVersionId = response.read("$.id").toString();
+        final Integer totalVersionsAfterUpdate = getVersionsForCertificate(CREDENTIAL_NAME).size();
+
+        assertThat(secondVersionId, is(equalTo(firstVersionId)));
+        assertThat(totalVersionsAfterUpdate, is(equalTo(totalVersionsBeforeUpdate)));
+    }
+
     private List<Object> getVersionsForCertificate(String certificateName) throws Exception {
         MockHttpServletRequestBuilder getRequest = get("/api/v1/certificates?name=" + certificateName)
                 .header("Authorization", "Bearer " + ALL_PERMISSIONS_TOKEN)

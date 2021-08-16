@@ -52,6 +52,8 @@ class CertificateGenerationParameters : GenerationParameters {
 
     var allowTransitionalParentToSign: Boolean = false
 
+    var minimumDurationEnabled: Boolean = false
+
     constructor(generationParameters: CertificateGenerationRequestParameters) : super() {
 
         this.keyUsage = buildKeyUsage(generationParameters)
